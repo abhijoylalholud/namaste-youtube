@@ -1,8 +1,44 @@
-import { useDispatch } from "react-redux";
 import { toggleMenu } from "../utils/appSlice";
+import { useEffect, useState } from "react";
+import { YOUTUBE_SEARCH_API } from "../utils/constants";
+import { useDispatch, useSelector } from "react-redux";
+import { cacheResults } from "../utils/searchSlice";
 
 const Head = () => {
+    const [searchQuery, setSearchQuery] = useState("");
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
+    const searchCache = useSelector((store) => store.search);
     const dispatch = useDispatch();
+    
+    useEffect(() => {
+        //const timer = setTimeout(() => getSearchSuggestions(), 200);
+        const timer = setTimeout(() => {   
+            if(searchCache[searchQuery]) {
+                setSuggestions(searchCache[searchQuery]);
+            } else {
+                getSearchSuggestions();
+            }
+        }, 200);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [searchQuery]);
+
+    const getSearchSuggestions = async () => {
+        //console.log("API call: " + searchQuery);
+        const data = await fetch(YOUTUBE_SEARCH_API + searchQuery);
+        const json = await data.json();
+        //console.log(json[1]);
+        setSuggestions(json[1]);
+        dispatch(
+            cacheResults({
+                [searchQuery]: json[1],
+            })
+        );
+    };
     
     const toggleMenuHandler = () => {
         dispatch(toggleMenu())
@@ -20,8 +56,26 @@ const Head = () => {
 
             </div>
             <div className="col-span-10 px-10">
-                <input className="w-1/2 border border-gray-400 p-2 rounded-l-full" type="text" />
-                <button className="border border-gray-400 px-5 py-2 rounded-r-full bg-gray-100">🔍</button>
+                <div>
+                    <input 
+                        className="px-5 w-1/2 border border-gray-400 p-2 rounded-l-full"     
+                        type="text" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onFocus={() => setShowSuggestions(true)}
+                        onBlur={() => setShowSuggestions(false)}
+                    />
+                    <button className="border border-gray-400 px-5 py-2 rounded-r-full bg-gray-100">🔍</button>
+                </div>
+                { showSuggestions && (
+                <div className="fixed bg-white py-2 px-2 w-[37rem] shadow-lg rounded-lg border border-gray-100">
+                    <ul>
+                        {suggestions.map((s) => (
+                            <li key={s} className="py-2 px-3 shadow-sm hover:bg-gray-100">🔍 {s}</li>
+                        ))}
+                    </ul>
+                </div> )}
+
             </div>
             <div className="col-span-1">
                 <img className="h-8" alt="user-icon" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALgAAACUCAMAAAAXgxO4AAAAbFBMVEX///8AAAAsLCz8/PwEBAT5+fn09PTt7e3w8PDg4OB/f3+tra2CgoJBQUHc3Nzk5OQPDw+NjY1NTU3Hx8d5eXm8vLybm5tkZGQ4ODheXl5wcHC2trbQ0NDW1tZpaWlISEijo6MjIyMXFxdWVlYkIv9JAAAEsUlEQVR4nO2aa3OyOhCAE5cQ5I4IUrzg5f//x5MEUV+1NiiB9UyeD+10OmOf2W52NxdCLBaLxWKxWCwWi8VisVj+n8DlyxchfQG6b98FSGMA+C7xr5JVQJcaPN9n9Wq1y/Y5b3+BGgAGjLjz4JTSC+kpmLuEMMzpLjOa5eHsIu046lsV5gz1OhVq8+yghB3afVNfZlmMWFxk+HpxjXMXdIfKnxdBWyDR2YvkJiy7Vb4nY2rxIjOX0XTrF9qCmqs1OrXqHUB4SOmLiItfhRxdwAVu5rzylpnvZB66JcrI+nWetKxxrU7psjm8jPeZw2Zq11tUmfv5twr+lucrbKmSUz1xmk9teoto9Cf6sqR04g49ISqIQqQ4/p3fLccCjzgBd6nr7dAlIDKfL7S96WKORhxIcdCNuKiIBZomBFDqe1O6xxNx/RSXhC4WccJXfcR3HE3Ik0an3Xcskql9L8yjPhGP5lP7XoirPuIVnnr4tREXOd6DBk+Oi6rSY3Gu+NS+HeD6fSLuu1hyHEjPzolFnPSaVWbF1LY3yOlQJ8vlsZaYDtnUvh1AQr1oy91diOpsJT92B51/iR9zNFOtOhGUY5aW+ArRgbP02OglOaUbguzgs9YT3+EphWe2lY75bItOXPfsEJs3ACtfR1z+tmSEoTMnbvjbMZxzvk8J3aktnyAqhZy1nke9rfE+Rm9V49wyfeqtSEs0U+Et6k6ZkfzplkKGOyoAX35fAMLLinap7lxzflai2T08RfXQbHFdkq33IkN1Kv6IeqBCWLyub7b91XIdyztQtGly9paPDcDlm6AM/WVYBlvOCM4r5RboTr2fDFDqPrl9LoTPHuSVOI+9Z3KtthdzwDPRXhA+82AX+ZvftmW5H+0CPEdBV3K/kfdA1ap4Uvi8YieX67EJ8ZQXkLfKJPaPXadJmyz/p7e7edikXXFP/VgWnumXqnzLBPHDXrnxy6AQBKX/0Ev9OYbXH0KAB7dnns7jiHj9uW1JUeBNH3Eg2zpVas5F8m6/f/Oo4jzeOsvttHeG8v+9rrpAPgb4Zsa6+4dEa9WVJjoZEl2cLanu9v6OJZuyISX1u96U1olqWpOw/XlXW6bLabId/1bvycRTcdqaj4/I76R6O03OyGussfO89f5QnEbJ6OMuJOqY8xNxWUNXo19keT4dQtwJvfGc1XY+UAcRH2VKu6EOZJqPUxZBLEy9t2Na8sVoC1T8FS/SuoDQIvJG3JBmd+PJ28hPCUeSFuSHwQIuPuaQjxVwvhvE+cKOjyQefNx47gjGmW8TrWe0ffgZoQ1BG/BhxdPAeF2RzUfufgcVd2jDRqiI+dAZfn7jbFy811M9PW8xbJkWBxIP7d0OW6Z3Qz3f1OhTmk4VNnimtPyYHm83vZ4Y6lNtDId8/+JC8BPSvVFtwnq9d9NHzIhmu37y9knKXxhu+9uPjyR+ozJ7yFKkZrwdmhp81QcE9oYCLj50b6yqyEuTzIR1K54ZW50i4G499ER7Na9NPgrxBt9DXDHaO3ljSFx8amPsfYVIFW6o4ctUqcyJA/CDKXFKD6Y6kDwmS6LDzBSRudY5/a2qxWKxWCwWi8VisVgsFovFYhmL/wAIJDWPptFE0wAAAABJRU5ErkJggg==" />
